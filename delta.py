@@ -56,17 +56,26 @@ def compare(alpha: DataFrame, beta: DataFrame) -> bool:
         if alpha_cols[i] != beta_cols[i]:
             differences.append(f'column order does not match: {i} alpha {alpha_cols[i]}, beta {beta_cols[i]}')
 
-    if len(differences) > 0:
-        return False
+    # column types
+
+    for i in range(alpha_col_count):
+        alpha_dtype = alpha.dtypes.iloc[i]
+        beta_dtype = beta.dtypes.iloc[i]
+        if alpha_dtype != beta_dtype:
+            alpha_col_name = alpha_cols[i]
+            beta_col_name = beta_cols[i]
+            differences.append(f'column types do not match: alpha {alpha_col_name} {alpha_dtype}, beta {beta_col_name} {beta_dtype}')
+
+    # --------------------------------------
 
     col_count = alpha_col_count
 
     for row_idx in range(1):
         for col_idx in range(col_count):
             col = alpha_cols[col_idx]
-            alpha_val = alpha[col][row_idx]
-            beta_val = beta[col][row_idx]
-            print(col, alpha_val, beta_val)
+            alpha_val = alpha[col].iloc[row_idx]
+            beta_val = beta[col].iloc[row_idx]
+            #print(col, alpha_val, beta_val)
             if alpha_val != beta_val:
                 differences.append(f'row {row_idx}, col {col}: alpha {alpha_val}, beta {beta_val}')
 
