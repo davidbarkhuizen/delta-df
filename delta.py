@@ -1,9 +1,11 @@
-from pandas import read_pickle, DataFrame
-
 # load two dataframes from file (pickle)
 # systematically compare them
 
-import logging
+from pandas import NaT, read_pickle, DataFrame
+#import logging
+import pandas
+import sys
+from collections.abc import Callable
 
 def load_dataframe_from_file(file_path: str, compression: str) -> DataFrame:
 
@@ -21,7 +23,7 @@ def load_dataframe_from_file(file_path: str, compression: str) -> DataFrame:
 
 # pandas.DataFrame.compare
 
-def compare(alpha: DataFrame, beta: DataFrame) -> bool:
+def compare(alpha_label: str, alpha: DataFrame, beta_label: str, beta: DataFrame) -> bool:
     differences = []
 
     # row count
@@ -30,7 +32,7 @@ def compare(alpha: DataFrame, beta: DataFrame) -> bool:
     beta_row_count = len(beta.index)
 
     if alpha_row_count != beta_row_count:
-        differences.append(f'row counts do not match: alpha = {alpha_row_count}, beta = {beta_row_count}')
+        differences.append(f'row counts do not match: {alpha_label} = {alpha_row_count}, {beta_label} = {beta_row_count}')
 
     # column count
 
@@ -38,7 +40,7 @@ def compare(alpha: DataFrame, beta: DataFrame) -> bool:
     beta_col_count = len(beta.columns.to_list())
 
     if alpha_col_count != beta_col_count:
-        differences.append(f'column counts do not match: alpha = {alpha_col_count}, beta = {beta_col_count}')
+        differences.append(f'column counts do not match: {alpha_label} = {alpha_col_count}, {beta_label} = {beta_col_count}')
 
     # column name
         
@@ -54,41 +56,63 @@ def compare(alpha: DataFrame, beta: DataFrame) -> bool:
 
     for i in range(alpha_col_count):
         if alpha_cols[i] != beta_cols[i]:
-            differences.append(f'column order does not match: {i} alpha {alpha_cols[i]}, beta {beta_cols[i]}')
+            differences.append(f'column order does not match: {i} {alpha_label} {alpha_cols[i]}, {beta_label} {beta_cols[i]}')
 
     # column types
 
     for i in range(alpha_col_count):
         alpha_dtype = alpha.dtypes.iloc[i]
         beta_dtype = beta.dtypes.iloc[i]
+        alpha_col_name = alpha_cols[i]
+        beta_col_name = beta_cols[i]
         if alpha_dtype != beta_dtype:
-            alpha_col_name = alpha_cols[i]
-            beta_col_name = beta_cols[i]
-            differences.append(f'column types do not match: alpha {alpha_col_name} {alpha_dtype}, beta {beta_col_name} {beta_dtype}')
+            differences.append(f'column types do not match: {alpha_label} {alpha_col_name} {alpha_dtype}, {beta_label} {beta_col_name} {beta_dtype}')
+        #print(f'dtype for {alpha_col_name}: {alpha_dtype}')
 
     # --------------------------------------
+                    
+    def value_delta():
+        value_diff_count = 0
 
-    col_count = alpha_col_count
+        cols_with_val_diffs = []
 
-    for row_idx in range(1):
-        for col_idx in range(col_count):
-            col = alpha_cols[col_idx]
-            alpha_val = alpha[col].iloc[row_idx]
-            beta_val = beta[col].iloc[row_idx]
-            #print(col, alpha_val, beta_val)
-            if alpha_val != beta_val:
-                differences.append(f'row {row_idx}, col {col}: alpha {alpha_val}, beta {beta_val}')
+        for row_idx in range(alpha_row_count):
 
-    #     # values
-            
-    #     for column in column_union: 
-    #         for row_idx in range(alpha_row_count):
-    #             if alpha[column][row_idx] != beta[column][row_idx]:
-    #                 alpha_val = alpha[column][row_idx]
-    #                 beta_val = beta[column][row_idx]
+            # only log differences from the first differing row
+            log_difference = value_diff_count < 1
+            row_has_difference = False 
 
-    #                 print(f'value difference: column {column} row {row_idx}: alpha {alpha_val}, beta {beta_val}')
-         
+            for col_idx in range(alpha_col_count):
+                col = alpha_cols[col_idx]
+                alpha_val = alpha[col].iloc[row_idx]
+                beta_val = beta[col].iloc[row_idx]
+                if alpha_val != beta_val:
+                    if not pandas.isnull(alpha_val) and not pandas.isnull(beta_val):
+                        row_has_difference = True
+                        value_diff_count = value_diff_count + 1
+                        if col not in cols_with_val_diffs: cols_with_val_diffs.append(col)
+                        
+                        if log_difference:
+                            text = f'value difference in row {row_idx} column {col}: {alpha_label} ({type(alpha_val)}) : {alpha_val} compare {beta_label} ({type(beta_val)}) : {beta_val}'
+                            differences.append(text)
+
+            if row_has_difference and log_difference:
+                print('=-'*40)
+                print(f'{alpha_label}')
+                print()
+                print(f'{alpha.iloc[row_idx]}')
+
+                print('=-'*40)
+                print(f'{beta_label}')
+                print()
+                print(f'{beta.iloc[row_idx]}')
+
+
+        if value_diff_count > 0:
+            differences.append(f'found {value_diff_count} value differences in {alpha_row_count} records, across columns: {",".join(cols_with_val_diffs)}')
+
+    value_delta()
+   
     identical = len(differences) == 0
 
     if not identical:
@@ -97,15 +121,62 @@ def compare(alpha: DataFrame, beta: DataFrame) -> bool:
 
     return identical
 
-local_dev_file_path = '/Users/david.barkhuizen/development/lumos/mount/celery-worker-heavy/etl_input_set.pkl'
-local_dev = load_dataframe_from_file(local_dev_file_path, compression='zip')
+def diff(
+        alpha_label: str, alpha_path: str, 
+        beta_label: str, beta_path: str,
+        in_place_remediations: Callable[[DataFrame], None],
+    ):
 
-on_prem_file_path = '/Users/david.barkhuizen/code/delta-df/in/on_prem.pkl'
-on_prem = load_dataframe_from_file(on_prem_file_path, compression='gzip')
+    print('loading from file ...')
 
-identical = compare(on_prem, local_dev)
-if identical:
-    print('data frames are identical')
+    alpha_df = load_dataframe_from_file(alpha_path, compression='zip')
+    beta_df = load_dataframe_from_file(beta_path, compression='gzip')
 
-#diff = on_prem.compare(local_dev, align_axis=1, keep_shape=False, keep_equal=False, result_names=('on-prem', 'local-dev'))
-#print(diff)
+    if in_place_remediations is not None:
+        print(f'applying in-place remediations to {alpha_label} ...')
+        in_place_remediations(alpha_df)
+
+    # align
+
+    sort_order = [ 
+        'main_start_date', 
+        'kk_date', 
+        'trip_id', 
+        'start_date', 
+        'dossier_code', 
+        'actual_trip_code', 
+        'core_trip_code' 
+    ] 
+    
+    for df in [alpha_df, beta_df]:
+        df.sort_values(by=sort_order, inplace=True)
+
+    # compare
+        
+    print('comparing ...')
+        
+    identical = compare(alpha_label, alpha_df, beta_label, beta_df)
+    if identical:
+        print('data frames are identical')
+    else:
+        print('data frames are NOT identical')
+
+    return identical
+
+args = sys.argv[1:]
+
+alpha_label = args[0] 
+alpha_path = args[1]
+
+beta_label = args[2]
+beta_path = args[3]
+
+print(f'comparing {alpha_label} and {beta_label}')
+print(f'{alpha_label} @ {alpha_path}')
+print(f'{beta_label} @ {beta_path}')
+
+def in_place_remediations_to_alpha(alpha_df: DataFrame):
+    alpha_df.replace('', None, inplace=True)
+    #pass
+
+print(diff(alpha_label, alpha_path, beta_label, beta_path, in_place_remediations_to_alpha))
