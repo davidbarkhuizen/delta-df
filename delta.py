@@ -71,12 +71,11 @@ def compare(
     # column types
 
     for i in range(ref_col_count):
-        alpha_dtype = ref_df.dtypes.iloc[i]
-        beta_dtype = target_df.dtypes.iloc[i]
-        alpha_col_name = ref_cols[i]
-        beta_col_name = target_cols[i]
-        if alpha_dtype != beta_dtype:
-            differences.append(f'column types do not match: {ref_label} {alpha_col_name} {alpha_dtype}, {target_label} {beta_col_name} {beta_dtype}')
+        ref_dtype = ref_df.dtypes.iloc[i]
+        target_dtype = target_df.dtypes.iloc[i]
+        col_name = ref_cols[i]
+        if ref_dtype != target_dtype:
+            differences.append(f'types do not match for col {col_name}: {ref_label} = {ref_dtype}, {target_label} = {target_dtype}')
 
     # --------------------------------------
                 
@@ -85,64 +84,79 @@ def compare(
         row_diff_count = 0
 
         cols_with_val_diffs = []
+        row_idxs_to_detail = []
+
+        l1 = 30
+        l2 = 75
+        differences.append(f'{"".rjust(l1)}{ref_label.ljust(l2)}{target_label.ljust(l2)}')
 
         for row_idx in range(ref_row_count):
 
             row_has_a_difference = False
 
-            # only log differences for the first differing row
-            #
-            log_value_differences = row_diff_count == 0
-
             for col_idx in range(ref_col_count):
 
                 col = ref_cols[col_idx]
-                alpha_val = ref_df[col].iloc[row_idx]
-                beta_val = target_df[col].iloc[row_idx]
+                ref_val = ref_df[col].iloc[row_idx]
+                target_val = target_df[col].iloc[row_idx]
 
                 # detect superficial difference
                 #
-                if alpha_val != beta_val:
+                if ref_val != target_val:
 
                     row_has_a_difference = True
                     
                     # exclude null casess
                     #
-                    if not are_equal_null_values(alpha_val, beta_val): 
+                    if not are_equal_null_values(ref_val, target_val): 
                             
                         cell_difference_count = cell_difference_count + 1
                         
                         if col not in cols_with_val_diffs:
+
+                            if row_idx not in row_idxs_to_detail:
+                                row_idxs_to_detail.append(row_idx)
+
                             cols_with_val_diffs.append(col)
-                        
-                        if log_value_differences:
                             
-                            text = f'value difference in row {row_idx} column {col}: {ref_label} ({type(alpha_val)}) : {alpha_val} compare {target_label} ({type(beta_val)}) : {beta_val}'
-                            differences.append(text)
+                            # text = f'value difference in row {row_idx} column {col}: {ref_label} ({type(alpha_val)}) : {alpha_val} compare {target_label} ({type(beta_val)}) : {beta_val}'
+                            # differences.append(text)
+
+                            label_str = f'{col} (row {row_idx})'
+                            ref_str = f'{ref_val} ({type(ref_val)})'
+                            target_str = f'{target_val} ({type(target_val)})'
+
+                            differences.append(f'{label_str.ljust(l1)}{ref_str.ljust(l2)}{target_str.ljust(l2)}')
 
             if row_has_a_difference:
-                
                 row_diff_count = row_diff_count + 1
-                
-                if log_value_differences:
-
-                    differences.append('=-'*40)
-
-                    l1 = 20
-                    l2 = 75
-                    differences.append(f'{"".rjust(l1)}{ref_label.rjust(l2)}{target_label.rjust(l2)}')
-                    for col in ref_cols:
-
-                        ref_val = ref_df[col].iloc[row_idx]
-                        target_val = target_df[col].iloc[row_idx]
-
-                        ref_str = f'{ref_val} ({type(ref_val)})'
-                        target_str = f'{target_val} ({type(target_val)})'
-
-                        differences.append(f'{col.ljust(l1)}{ref_str.rjust(l2)}{target_str.rjust(l2)}')
+        
+        col_diff_count = len(cols_with_val_diffs)
 
         if cell_difference_count > 0:
-            differences.append(f'found differences in {cell_difference_count} cells, {row_diff_count} rows, {cols_with_val_diffs} cols')
+            differences.append(f'in total, found differences in {cell_difference_count} cells, {row_diff_count} rows, {col_diff_count} cols')
+
+        for row_idx in row_idxs_to_detail:
+
+            differences.append('-'*80)
+            differences.append(f'row: {row_idx}')
+            differences.append(f'{"".rjust(l1)}{ref_label.ljust(l2)}{target_label.ljust(l2)}')
+
+            for col_idx in range(ref_col_count):
+
+                col = ref_cols[col_idx]
+
+                ref_val = ref_df[col].iloc[row_idx]
+                target_val = target_df[col].iloc[row_idx]
+
+                label_str = f'{col} (row {row_idx})'
+                ref_str = f'{ref_val} ({type(ref_val)})'
+                target_str = f'{target_val} ({type(target_val)})'
+
+                differences.append(f'{label_str.ljust(l1)}{ref_str.ljust(l2)}{target_str.ljust(l2)}')
+
+            differences.append('')
+
 
     value_delta()
    
