@@ -40,7 +40,7 @@ def compare(
     if ref_row_count != target_row_count:
         differences.append(f'row counts do not match: {ref_label} = {ref_row_count}, {target_label} = {target_row_count}')
     else:
-        print(f'row count at {ref_row_count} is consistent across both')
+        differences.append(f'row count at {ref_row_count} is consistent across both')
 
     # column count
         
@@ -53,7 +53,7 @@ def compare(
     if ref_col_count != target_col_count:
         differences.append(f'column counts do not match: {ref_label} = {ref_col_count}, {target_label} = {target_col_count}')
     else:
-        print(f'{ref_col_count} columns: {", ".join(ref_cols)}')
+        differences.append(f'{ref_col_count} columns: {", ".join(ref_cols)}')
 
     # column name
         
@@ -126,11 +126,11 @@ def compare(
                 
                 if log_value_differences:
 
-                    print('=-'*40)
+                    differences.append('=-'*40)
 
                     l1 = 20
                     l2 = 75
-                    print(''.rjust(l1), ref_label.rjust(l2), target_label.rjust(l2))
+                    differences.append(f'{"".rjust(l1)}{ref_label.rjust(l2)}{target_label.rjust(l2)}')
                     for col in ref_cols:
 
                         ref_val = ref_df[col].iloc[row_idx]
@@ -139,7 +139,7 @@ def compare(
                         ref_str = f'{ref_val} ({type(ref_val)})'
                         target_str = f'{target_val} ({type(target_val)})'
 
-                        print(f'{col.ljust(l1)}{ref_str.rjust(l2)}{target_str.rjust(l2)}')
+                        differences.append(f'{col.ljust(l1)}{ref_str.rjust(l2)}{target_str.rjust(l2)}')
 
         if cell_difference_count > 0:
             differences.append(f'found differences in {cell_difference_count} cells, {row_diff_count} rows, {cols_with_val_diffs} cols')
@@ -150,8 +150,10 @@ def compare(
 
     if not identical:
         print()
-        print('DIFFERENCES:')
+        print('summary report'.upper())
+        print()
         [print(difference) for difference in differences]
+        print()
 
     return identical
 
