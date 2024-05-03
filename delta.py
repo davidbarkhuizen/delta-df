@@ -27,8 +27,7 @@ def are_equal_null_values(alpha: any, beta: any):
 
 def compare(
         ref_label: str, ref_df: DataFrame, 
-        target_label: str, target_df: DataFrame,
-        sort_order: List[str]
+        target_label: str, target_df: DataFrame
     ) -> bool:
     
     differences = []
@@ -126,21 +125,24 @@ def compare(
                 row_diff_count = row_diff_count + 1
                 
                 if log_value_differences:
-                    print('=-'*40)
-                    print(f'{ref_label}')
-                    print()
-                    print(f'{ref_df.iloc[row_idx]}')
 
                     print('=-'*40)
-                    print(f'{target_label}')
-                    print()
-                    print(f'{target_df.iloc[row_idx]}')
 
-                    print('abandoning checking for further value differences after first row')
-                    break
+                    l1 = 20
+                    l2 = 75
+                    print(''.rjust(l1), ref_label.rjust(l2), target_label.rjust(l2))
+                    for col in ref_cols:
+
+                        ref_val = ref_df[col].iloc[row_idx]
+                        target_val = target_df[col].iloc[row_idx]
+
+                        ref_str = f'{ref_val} ({type(ref_val)})'
+                        target_str = f'{target_val} ({type(target_val)})'
+
+                        print(f'{col.ljust(l1)}{ref_str.rjust(l2)}{target_str.rjust(l2)}')
 
         if cell_difference_count > 0:
-            differences.append(f'found {cell_difference_count} value differences in {ref_row_count} records, across columns: {",".join(cols_with_val_diffs)}, in {row_diff_count} rows')
+            differences.append(f'found differences in {cell_difference_count} cells, {row_diff_count} rows, {cols_with_val_diffs} cols')
 
     value_delta()
    
