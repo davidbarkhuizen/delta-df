@@ -9,7 +9,8 @@ declare -a file_names=(
     # "bookings_df_after_fin_cols.pkl"
 )
 
-sort_order="core_trip_id,actual_trip_code,trip_id" # ,compass_booking_id
+# sort_order="core_trip_id,actual_trip_code,trip_id,cogs_expected"
+sort_order="core_trip_id,actual_trip_code,trip_id,cogs_expected,cogs_validated"
 
 for file_name in "${file_names[@]}"
 do
@@ -23,7 +24,7 @@ do
         --ref_compression='gzip' \
         --target_label='staging' \
         --target_path="/Users/david.barkhuizen/code/delta-df/in/staging/${file_name}" \
-        --target_compression='zip' \
+        --target_compression='gzip' \
         --sort_order="${sort_order}"
 
     echo

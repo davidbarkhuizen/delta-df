@@ -2,6 +2,7 @@
 
 import argparse
 from typing import List
+import time
 
 from pandas import NaT, read_pickle, DataFrame
 #import logging
@@ -13,12 +14,16 @@ def load_dataframe_from_file(file_path: str, compression: str) -> DataFrame:
 
     print(f'loading dataframe from pkl file at {file_path} ...')
 
+    started_at = time.process_time()
+
     df = read_pickle(
         filepath_or_buffer=file_path,
         compression=compression
     )
 
-    print(f'... loaded')
+    elapsed_s = time.process_time() - started_at
+
+    print(f'... loaded (in {elapsed_s} s)')
 
     return df
 
@@ -29,6 +34,10 @@ def compare(
         ref_label: str, ref_df: DataFrame, 
         target_label: str, target_df: DataFrame
     ) -> bool:
+
+    print('comparing...')
+
+    started_at = time.process_time()
     
     differences = []
 
@@ -39,8 +48,6 @@ def compare(
 
     if ref_row_count != target_row_count:
         differences.append(f'row counts do not match: {ref_label} = {ref_row_count}, {target_label} = {target_row_count}')
-    else:
-        differences.append(f'row count at {ref_row_count} is consistent across both')
 
     # column count
         
@@ -52,8 +59,6 @@ def compare(
 
     if ref_col_count != target_col_count:
         differences.append(f'column counts do not match: {ref_label} = {ref_col_count}, {target_label} = {target_col_count}')
-    else:
-        differences.append(f'{ref_col_count} columns: {", ".join(ref_cols)}')
 
     # column name
         
@@ -88,7 +93,8 @@ def compare(
 
         l1 = 30
         l2 = 75
-        differences.append(f'{"".rjust(l1)}{ref_label.ljust(l2)}{target_label.ljust(l2)}')
+
+        row_diff_label_printed = False
 
         for row_idx in range(ref_row_count):
 
@@ -104,11 +110,13 @@ def compare(
                 #
                 if ref_val != target_val:
 
-                    row_has_a_difference = True
-                    
-                    # exclude null casess
-                    #
                     if not are_equal_null_values(ref_val, target_val): 
+
+                        row_has_a_difference = True
+
+                        if not row_diff_label_printed:
+                            differences.append(f'{"".rjust(l1)}{ref_label.ljust(l2)}{target_label.ljust(l2)}')
+                            row_diff_label_printed = True
                             
                         cell_difference_count = cell_difference_count + 1
                         
@@ -134,13 +142,14 @@ def compare(
         col_diff_count = len(cols_with_val_diffs)
 
         if cell_difference_count > 0:
-            differences.append(f'in total, found differences in {cell_difference_count} cells, {row_diff_count} rows, {col_diff_count} cols')
+            differences.append(f'in total, found differences in {cell_difference_count} cells, {row_diff_count} rows, {col_diff_count} columns ({", ".join(cols_with_val_diffs)})')
 
         for row_idx in row_idxs_to_detail:
 
             differences.append('-'*80)
             differences.append(f'row: {row_idx}')
             differences.append(f'{"".rjust(l1)}{ref_label.ljust(l2)}{target_label.ljust(l2)}')
+            differences.append('')
 
             for col_idx in range(ref_col_count):
 
@@ -157,10 +166,12 @@ def compare(
 
             differences.append('')
 
-
     value_delta()
    
     identical = len(differences) == 0
+
+    elapsed_s = time.process_time() - started_at
+    print(f'... compared (in {elapsed_s} s)')
 
     if not identical:
         print()
@@ -202,9 +213,8 @@ def diff(
     
     # compare
         
-    print('comparing ...')
-        
     identical = compare(ref_label, ref_df, target_label, target_df)
+    
     if identical:
         print('data frames are identical')
     else:
@@ -256,5 +266,5 @@ identical = diff(
     args[REF_LABEL], args[REF_PATH], args[REF_COMPRESSION],
     args[TARGET_LABEL], args[TARGET_PATH], args[TARGET_COMPRESSION],
     sort_order = args[SORT_ORDER].split(','),
-    in_place_remediations_to_target=lambda df: df.replace('', None, inplace=True)
+    # in_place_remediations_to_target=lambda df: df.replace('', None, inplace=True)
 )
